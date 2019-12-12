@@ -22,11 +22,21 @@ export class AuthComponent {
     if (!form.valid) {
       return;
     }
+    let email = form.value.email;
+    let password = form.value.password;
     this.isLoading = true;
     if (this.isLoginMode) {
+      this.authService.login(email, password).subscribe(
+        response => {
+          console.log(response);
+          this.isLoading = false;
+        },
+        errorRes => {
+          this.error = errorRes;
+          this.isLoading = false;
+        }
+      );
     } else {
-      let email = form.value.email;
-      let password = form.value.password;
       this.authService.signup(email, password).subscribe(
         response => {
           console.log(response);
