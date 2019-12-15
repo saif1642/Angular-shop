@@ -1,7 +1,8 @@
 import { Injectable } from "@angular/core";
 import { HttpClient, HttpErrorResponse } from "@angular/common/http";
-import { catchError } from "rxjs/operators";
-import { throwError } from "rxjs";
+import { catchError, tap } from "rxjs/operators";
+import { throwError, Subject } from "rxjs";
+import { User } from "./user.model";
 
 interface AuthResponseData {
   idToken: string;
@@ -14,6 +15,7 @@ interface AuthResponseData {
 
 @Injectable({ providedIn: "root" })
 export class AuthService {
+  user = new Subject<User>();
   constructor(private http: HttpClient) {}
 
   signup(email: string, password: string) {
@@ -26,7 +28,17 @@ export class AuthService {
           returnSecureToken: true
         }
       )
-      .pipe(catchError(this.handleErrors));
+      .pipe(
+        catchError(this.handleErrors),
+        tap(resData => {
+          this.handleAuthentication(
+            resData.email,
+            resData.localId,
+            resData.idToken,
+            resData.expiresIn
+          );
+        })
+      );
   }
 
   login(email: string, password: string) {
@@ -39,7 +51,28 @@ export class AuthService {
           returnSecureToken: true
         }
       )
-      .pipe(catchError(this.handleErrors));
+      .pipe(
+        catchError(this.handleErrors),
+        tap(resData => {
+          this.handleAuthentication(
+            resData.email,
+            resData.localId,
+            resData.idToken,
+            resData.expiresIn
+          );
+        })
+      );
+  }
+
+  private handleAuthentication(
+    email: string,
+    id: string,
+    token: string,
+    expiresIn: string
+  ) {
+    const expirationDate = new Date(new Date().getTime() + +expiresIn * 1000);
+    const user = new User(email, id, token, expirationDate);
+    this.user.next(user);
   }
 
   private handleErrors(errorRes: HttpErrorResponse) {
@@ -50,6 +83,13 @@ export class AuthService {
     switch (errorRes.error.error.message) {
       case "EMAIL_EXISTS":
         errorMsg = "This Email Already Exist";
+        break;
+      case "EMAIL_NOT_FOUND":
+        errorMsg = "This email does not exist";
+        break;
+      case "INVALID_PASSWORD":
+        errorMsg = "Given Password is incorrect";
+        break;
     }
     return throwError(errorMsg);
   }
